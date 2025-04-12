@@ -2,77 +2,68 @@
 <html>
 <head>
   <title>TCP Relay Tool</title>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron&display=swap" rel="stylesheet">
   <style>
-    body {
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
       font-family: sans-serif;
-      padding: 2rem;
-      transition: background 0.4s ease, color 0.4s ease;
-    }
-
-    /* ==== STANDARD THEME ==== */
-    body.standard {
       background-color: #ffffff;
       color: #000000;
     }
 
-    body.standard h1, body.standard h2 {
+    body {
+      display: flex;
+      flex-direction: column;
+      font-family: sans-serif;
+      font-size: 10px;
+      transition: background 0.4s ease, color 0.4s ease;
+    }
+
+    h1, h2 {
       color: #000000;
     }
 
-    body.standard input,
-    body.standard button {
+    input {
       background: #f0f0f0;
       color: #000;
       border: 1px solid #aaa;
+      padding: 0.4rem;
+      font-size: 0.5em;
+      border-radius: 5px;
+      width: 200px;
     }
 
-    body.standard pre {
-      background: #eee;
+    button {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      font-size: 0.5em;
+      font-weight: bold;
       color: #000;
-      border-left: 4px solid #aaa;
+      background: #ddd;
+      border: 1px solid #aaa;
+      border-radius: 5px;
+      cursor: pointer;
     }
 
-    /* ==== CYBERPUNK THEME ==== */
-    body.cyberpunk {
-      font-family: 'Orbitron', sans-serif;
-      background-color: #0f0f1a;
-      color: #00ffff;
+    button:hover {
+      background: #ccc;
     }
 
-    body.cyberpunk h1, body.cyberpunk h2 {
-      color: #ff00ff;
-      text-shadow: 0 0 8px #ff00ff;
+    #controls {
+      padding: 1.5rem;
+      flex-shrink: 0;
     }
 
-    body.cyberpunk label {
-      color: #00ff99;
-    }
-
-    body.cyberpunk input {
-      background: #1a1a2e;
-      color: #00ffff;
-      border: 1px solid #00ffff;
-      box-shadow: 0 0 5px #00ffff;
-    }
-
-    body.cyberpunk button {
-      background: #00ffff;
+    #log {
+      flex-grow: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 1rem;
+      white-space: pre-wrap;
+      background: #f4f4f4;
       color: #000;
-      box-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
-    }
-
-    body.cyberpunk button:hover {
-      background: #ff00ff;
-      box-shadow: 0 0 10px #ff00ff, 0 0 20px #ff00ff;
-      color: #fff;
-    }
-
-    body.cyberpunk pre {
-      background: #1a1a2e;
-      color: #00ffcc;
-      border-left: 4px solid #00ffff;
-      box-shadow: inset 0 0 10px #00ffff;
     }
 
     .log-entry {
@@ -81,87 +72,44 @@
 
     .headline {
       font-weight: bold;
-    }
-
-    body.cyberpunk .headline {
-      color: #ff00ff;
-      text-shadow: 0 0 4px #ff00ff;
-    }
-
-    body.cyberpunk .message {
-      color: #00ff99;
+      color: #000;
     }
 
     .message {
       margin-left: 1rem;
       white-space: pre-wrap;
       word-break: break-word;
-    }
-
-    /* ==== Toggle Switch Style ==== */
-    .switch {
-      position: absolute;
-      top: 1rem;
-      right: 2rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .switch input {
-      width: 40px;
-      height: 20px;
-      appearance: none;
-      background: #ccc;
-      border-radius: 20px;
-      position: relative;
-      outline: none;
-      cursor: pointer;
-      transition: background 0.3s;
-    }
-
-    .switch input::before {
-      content: "";
-      position: absolute;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: #fff;
-      top: 1px;
-      left: 1px;
-      transition: transform 0.3s;
-    }
-
-    .switch input:checked {
-      background: #00ffff;
-    }
-
-    .switch input:checked::before {
-      transform: translateX(20px);
+      color: #333;
     }
   </style>
 </head>
-<body class="cyberpunk">
-  <div class="switch">
-    <label for="themeToggle">Cyberpunk</label>
-    <input type="checkbox" id="themeToggle" checked />
+<body>
+  <div id="controls">
+    <h1>TCP Relay Tool</h1>
+    <div>
+      <label>Listen Port: <input id="listenPort" type="number" value="9000" /></label><br/>
+      <label>Target Host: <input id="targetHost" value="127.0.0.1" /></label><br/>
+      <label>Target Port: <input id="targetPort" type="number" value="80" /></label><br/>
+      <button id="toggleButton">Start Relay</button><br/><br/>
+      <label>
+        <input type="checkbox" id="holdToggle" />
+        Hold Mode
+      </label>
+    </div>
+    <h2>Log Feed</h2>
   </div>
 
-  <h1>🕶️ TCP Relay Tool</h1>
-  <div>
-    <label>Listen Port: <input id="listenPort" type="number" value="9000" /></label>
-    <label>Target Host: <input id="targetHost" value="127.0.0.1" /></label>
-    <label>Target Port: <input id="targetPort" type="number" value="80" /></label>
-    <button id="toggleButton">Start Relay</button>
-  </div>
-
-  <h2>🛰️ Log Feed</h2>
   <pre id="log"></pre>
+
+  <div id="holdEditor" style="padding: 1rem; background: #fafafa; border-top: 1px solid #ccc;">
+    <h3>Review / Edit Packet</h3>
+    <textarea id="editBox" rows="5" style="width: 100%; font-family: monospace;"></textarea><br/>
+    <button id="forwardBtn">Forward Edited Packet</button>
+  </div>
 
   <script>
     const logEl = document.getElementById('log');
     const button = document.getElementById('toggleButton');
-    const themeToggle = document.getElementById('themeToggle');
     const socket = new WebSocket('ws://' + location.host);
     let isRunning = false;
 
@@ -175,6 +123,8 @@
     };
 
     function appendLog(headline, message) {
+      console.log("appendLog() is invoked.");
+
       const entry = document.createElement('div');
       entry.className = 'log-entry';
 
@@ -188,10 +138,21 @@
 
       entry.appendChild(h);
       entry.appendChild(m);
-
       logEl.appendChild(entry);
       logEl.scrollTop = logEl.scrollHeight;
+
+      // Detect hold-mode logs
+      if (headline === 'Device → Server' || headline === 'Server → Device') {
+        if (holdToggle.checked) {
+          latestHoldPacket = {
+            direction: headline === 'Device → Server' ? 'deviceToServer' : 'serverToDevice',
+            dataHex: message
+          };
+          editBox.value = message;
+        }
+      }
     }
+
 
     async function startRelay() {
       const listenPort = parseInt(document.getElementById('listenPort').value);
@@ -232,10 +193,41 @@
       }
     });
 
-    // Theme Toggle Logic
-    themeToggle.addEventListener('change', () => {
-      document.body.className = themeToggle.checked ? 'cyberpunk' : 'standard';
+    const holdToggle = document.getElementById('holdToggle');
+    const editBox = document.getElementById('editBox');
+    const forwardBtn = document.getElementById('forwardBtn');
+
+    let latestHoldPacket = null;
+
+    holdToggle.addEventListener('change', async () => {
+      const enabled = holdToggle.checked;
+      await fetch('/set_hold_mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled })
+      });
     });
+
+    forwardBtn.addEventListener('click', async () => {
+      if (!latestHoldPacket) return;
+
+      const editedHex = editBox.value.trim();
+      const response = await fetch('/forward_packet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          direction: latestHoldPacket.direction,
+          dataHex: editedHex
+        })
+      });
+
+      if (response.ok) {
+        appendLog('Forwarded', `Sent to ${latestHoldPacket.direction}`);
+        latestHoldPacket = null;
+        editBox.value = '';
+      }
+    });
+
   </script>
 </body>
 </html>

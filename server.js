@@ -8,6 +8,9 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+let holdMode = false;
+let storedPacket = null; // holds the latest intercepted packet for forwarding
+
 app.use(bodyParser.json());
 app.use(express.static('public'));
 
@@ -48,17 +51,34 @@ app.post('/tool_start', (req, res) => {
       logToBrowser('Connected to Server', `Target server: ${targetHost}:${targetPort}`);
     });
 
+    // device -> server
     deviceSocket.on('data', (data) => {
       const hex = data.toString('hex');
-      logToBrowser('Device → Server', hex);
-      currentServerSocket.write(data);
-    });
+      logToBrowser('Device → Server', hex); // ✅ always log it
+    
+      if (holdMode) {
+        storedPacket = { direction: 'deviceToServer', dataHex: hex };
+        logToBrowser('Hold Mode', `Paused packet for editing`);
+        // Don't forward
+      } else {
+        currentServerSocket.write(data); // ✅ forward if not holding
+      }
+    });   
 
+    // server -> device
     currentServerSocket.on('data', (data) => {
       const hex = data.toString('hex');
-      logToBrowser('Server → Device', hex);
-      deviceSocket.write(data);
+      logToBrowser('Server → Device', hex); // ✅ always log it
+    
+      if (holdMode) {
+        storedPacket = { direction: 'serverToDevice', dataHex: hex };
+        logToBrowser('Hold Mode', `Paused packet for editing`);
+        // Don't forward
+      } else {
+        deviceSocket.write(data); // ✅ forward if not holding
+      }
     });
+    
 
     const closeAll = () => {
       logToBrowser('Connection Closed', 'Device or server closed the connection.');
@@ -101,6 +121,38 @@ app.post('/tool_stop', (req, res) => {
     res.json({ success: true });
   });
 });
+
+app.post('/forward_packet', (req, res) => {
+  const { direction, dataHex } = req.body;
+  const buffer = Buffer.from(dataHex, 'hex');
+
+  if (direction === 'deviceToServer' && currentServerSocket) {
+    currentServerSocket.write(buffer);
+    logToBrowser('Manual Forward', `Sent edited packet to server`);
+  } else if (direction === 'serverToDevice' && currentDeviceSocket) {
+    currentDeviceSocket.write(buffer);
+    logToBrowser('Manual Forward', `Sent edited packet to device`);
+  } else {
+    return res.status(400).json({ error: 'Invalid direction or socket not available' });
+  }
+
+  // ✅ log the edited payload as well
+  logToBrowser(
+    'Edited Forwarded Packet',
+    `To ${direction === 'deviceToServer' ? 'Server' : 'Device'}: ${dataHex}`
+  );
+
+  res.json({ success: true });
+});
+
+
+
+app.post('/set_hold_mode', (req, res) => {
+  holdMode = !!req.body.enabled;
+  logToBrowser('Hold Mode Toggled', `Hold mode is now ${holdMode ? 'ON' : 'OFF'}`);
+  res.json({ success: true });
+});
+
 
 server.listen(3000, () => {
   console.log('Web app running at http://localhost:3000');
