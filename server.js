@@ -36,6 +36,10 @@ let relayServer = null;
 let currentDeviceSocket = null;
 let currentServerSocket = null;
 
+app.get('/server_status', (req, res) => {
+  res.json({ alive: true });
+});
+
 app.post('/tool_start', (req, res) => {
   const { listenPort, targetHost, targetPort } = req.body;
 
@@ -82,10 +86,23 @@ app.post('/tool_start', (req, res) => {
 
     const closeAll = () => {
       logToBrowser('Connection Closed', 'Device or server closed the connection.');
-      deviceSocket.destroy();
-      currentServerSocket.destroy();
-      currentDeviceSocket = null;
-      currentServerSocket = null;
+    
+      if (currentDeviceSocket) {
+        currentDeviceSocket.destroy();
+        currentDeviceSocket = null;
+      }
+    
+      if (currentServerSocket) {
+        currentServerSocket.destroy();
+        currentServerSocket = null;
+      }
+    
+      if (browserSocket && browserSocket.readyState === WebSocket.OPEN) {
+        browserSocket.send(JSON.stringify({
+          headline: 'Relay Status',
+          message: 'disconnected'
+        }));
+      }
     };
 
     deviceSocket.on('close', closeAll);
@@ -110,14 +127,11 @@ app.post('/tool_stop', (req, res) => {
     return res.status(400).json({ error: 'Relay not running' });
   }
 
-  if (currentDeviceSocket) currentDeviceSocket.destroy();
-  if (currentServerSocket) currentServerSocket.destroy();
+  closeAll();
 
   relayServer.close(() => {
     logToBrowser('Relay Stopped', 'TCP relay server has been stopped.');
     relayServer = null;
-    currentDeviceSocket = null;
-    currentServerSocket = null;
     res.json({ success: true });
   });
 });

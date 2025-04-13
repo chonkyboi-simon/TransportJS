@@ -25,20 +25,24 @@
       color: #000000;
     }
 
+    /* Default input style */
     input {
-      background: #f0f0f0;
-      color: #000;
-      border: 1px solid #aaa;
       padding: 0.4rem;
-      font-size: 0.5em;
+      font-size: 0.95em;
       border-radius: 5px;
-      width: 200px;
+      border: 1px solid #aaa;
+    }
+
+    /* Field-specific widths */
+    #listenPort,
+    #targetPort, 
+    #targetHost {
+      width: 80px;
     }
 
     button {
-      margin-top: 1rem;
       padding: 0.5rem 1rem;
-      font-size: 0.5em;
+      font-size: 1em;
       font-weight: bold;
       color: #000;
       background: #ddd;
@@ -52,8 +56,15 @@
     }
 
     #controls {
-      padding: 1.5rem;
+      padding-top: 0.5rem;
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+      padding-bottom: 0rem;
       flex-shrink: 0;
+    }
+
+    #controls h2 {
+      margin-bottom: 0;
     }
 
     #log {
@@ -86,18 +97,29 @@
 <body>
   <div id="controls">
     <h1>TCP Relay Tool</h1>
-    <div>
-      <label>Listen Port: <input id="listenPort" type="number" value="9000" /></label><br/>
-      <label>Target Host: <input id="targetHost" value="127.0.0.1" /></label><br/>
-      <label>Target Port: <input id="targetPort" type="number" value="80" /></label><br/>
-      <button id="toggleButton">Start Relay</button><br/><br/>
-      <label>
+  
+    <!-- Line 1: Inputs -->
+    <h2>Connection Settings</h2>
+    <div class="control-row">
+      <label>Listen Port: <input id="listenPort" type="number" value="9000" /></label>
+      <label>Target Host: <input id="targetHost" value="127.0.0.1" /></label>
+      <label>Target Port: <input id="targetPort" type="number" value="80" /></label>
+    </div>
+  
+    <!-- Line 2: Button + Hold toggle -->
+    <h2>Tool Control</h2>
+    <div class="control-row">
+      <button id="toggleButton">Start Relay</button>
+      <label style="margin-left: 1rem;">
         <input type="checkbox" id="holdToggle" />
         Hold Mode
       </label>
+      <span id="serverStatus" style="margin-left: auto; font-weight: bold;">Checking...</span>
     </div>
+  
     <h2>Log Feed</h2>
   </div>
+  
 
   <pre id="log"></pre>
 
@@ -111,20 +133,27 @@
     const logEl = document.getElementById('log');
     const button = document.getElementById('toggleButton');
     const socket = new WebSocket('ws://' + location.host);
+    const serverStatusEl = document.getElementById('serverStatus');
     let isRunning = false;
 
     socket.onmessage = (event) => {
       try {
         const { headline, message } = JSON.parse(event.data);
+
+        // Handle relay disconnection notification
+        if (headline === 'Relay Status' && message === 'disconnected') {
+          isRunning = false;
+          button.textContent = 'Start Relay';
+        }
+
         appendLog(headline, message);
       } catch (err) {
         appendLog('Malformed Log', event.data);
       }
     };
 
-    function appendLog(headline, message) {
-      console.log("appendLog() is invoked.");
 
+    function appendLog(headline, message) {
       const entry = document.createElement('div');
       entry.className = 'log-entry';
 
@@ -134,43 +163,102 @@
 
       const m = document.createElement('div');
       m.className = 'message';
-      m.textContent = message;
+
+      // Try to highlight as TLS record
+      if (/^[0-9a-f]+$/i.test(message) && message.length >= 10) {
+        const type = message.slice(0, 2);
+        const version = message.slice(2, 6);
+        const length = message.slice(6, 10);
+        const payload = message.slice(10);
+
+        const typeLabel = tlsContentTypeLabel(type);
+        m.innerHTML = `
+          <span style="color: #d33;"><strong>Type:</strong> ${type} (${typeLabel})</span> |
+          <span style="color: #397;"><strong>Version:</strong> ${version}</span> |
+          <span style="color: #07a;"><strong>Length:</strong> ${length}</span><br/>
+          <span style="color: #000; background: #eee; display: inline-block; margin-top: 4px; padding: 4px;">${groupHex(payload)}</span>
+        `;
+      } else {
+        // Not a TLS record, just show plain
+        m.textContent = message;
+      }
 
       entry.appendChild(h);
       entry.appendChild(m);
       logEl.appendChild(entry);
       logEl.scrollTop = logEl.scrollHeight;
 
-      // Detect hold-mode logs
-      if (headline === 'Device → Server' || headline === 'Server → Device') {
-        if (holdToggle.checked) {
-          latestHoldPacket = {
-            direction: headline === 'Device → Server' ? 'deviceToServer' : 'serverToDevice',
-            dataHex: message
-          };
-          editBox.value = message;
-        }
+      // Update review/edit area if hold mode is enabled
+      if ((headline === 'Device → Server' || headline === 'Server → Device') && holdToggle.checked) {
+        latestHoldPacket = {
+          direction: headline === 'Device → Server' ? 'deviceToServer' : 'serverToDevice',
+          dataHex: message
+        };
+        editBox.value = message;
       }
     }
 
+    function tlsContentTypeLabel(hex) {
+      switch (hex.toLowerCase()) {
+        case '14': return 'Change Cipher Spec';
+        case '15': return 'Alert';
+        case '16': return 'Handshake';
+        case '17': return 'Application Data';
+        default: return 'Unknown';
+      }
+    }
+
+    function groupHex(hex, groupSize = 2, lineLength = 32) {
+      let result = '';
+      for (let i = 0; i < hex.length; i += groupSize) {
+        const group = hex.slice(i, i + groupSize);
+        result += group + ' ';
+        if ((i / groupSize + 1) % (lineLength / groupSize) === 0) result += '\n';
+      }
+      return result.trim();
+    }
+
+    async function checkServerStatus() {
+      try {
+        const res = await fetch('/server_status');
+        if (res.ok) {
+          serverStatusEl.textContent = '🟢 Tool Online';
+          serverStatusEl.style.color = 'green';
+        } else {
+          throw new Error();
+        }
+      } catch (e) {
+        serverStatusEl.textContent = '🔴 Tool Offline';
+        serverStatusEl.style.color = 'red';
+      }
+    }
 
     async function startRelay() {
       const listenPort = parseInt(document.getElementById('listenPort').value);
       const targetHost = document.getElementById('targetHost').value;
       const targetPort = parseInt(document.getElementById('targetPort').value);
 
-      const response = await fetch('/tool_start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ listenPort, targetHost, targetPort })
-      });
+      try {
+        const response = await fetch('/tool_start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ listenPort, targetHost, targetPort })
+        });
 
-      if (response.ok) {
-        isRunning = true;
-        button.textContent = 'Stop Relay';
-      } else {
-        const err = await response.json();
-        alert('Failed to start relay: ' + err.error);
+        if (response.ok) {
+          isRunning = true;
+          button.textContent = 'Stop Relay';
+        } else {
+          const err = await response.json();
+          if (err.error === 'Relay already running') {
+            isRunning = true;
+            button.textContent = 'Stop Relay';
+          } else {
+            alert('Failed to start relay: ' + err.error);
+          }
+        }
+      } catch (e) {
+        alert('Error connecting to backend.');
       }
     }
 
@@ -228,6 +316,9 @@
       }
     });
 
+    // Start polling every 2 seconds
+    setInterval(checkServerStatus, 2000);
+    checkServerStatus(); // Initial check
   </script>
 </body>
 </html>
