@@ -59,7 +59,7 @@ Follow the installer</br>
 <code>npm -v</code></br>
 
 <h3>Clone and Set Up TransportJS</h3>
-<code>git clone https://github.com/chonkyboi-simon/TransportJS.git</code>code></br>
+<code>git clone https://github.com/chonkyboi-simon/TransportJS.git</code></br>
 <code>cd TransportJS</code></br>
 <code>npm install</code></br>
 
